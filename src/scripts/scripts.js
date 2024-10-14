@@ -2,8 +2,7 @@ import Loki from "lokijs";
 const db = new Loki("ads.db");
 import { adsCollectionStore, adsStore } from "./store";
 import { get } from "svelte/store";
-import { fileURLToPath } from "url";
-import path, { join, dirname } from "path";
+import path from "path";
 const fs = require("fs");
 const https = require("https");
 /**
@@ -64,38 +63,40 @@ async function downloadFile(url, dest, callback) {
  */
 export async function fetchAds() {
   try {
-    const response = await fetch("http://localhost:3001/getMediaData");
-    const newAds = await response.json();
+    return new Promise(async (resolve, reject) => {
+      const response = await fetch("http://localhost:3001/getMediaData");
+      const newAds = await response.json();
 
-    adsStore.set([]);
-    await newAds.forEach(async (ad) => {
-      const existingAd = get(adsCollectionStore).findOne({ id: ad.id });
+      await newAds.forEach(async (ad) => {
+        const existingAd = get(adsCollectionStore).findOne({ id: ad.id });
 
-      if (
-        !existingAd ||
-        new Date(ad.updated_at) > new Date(existingAd.updated_at)
-      ) {
-        const downloadsPath = path.join(
-          process.cwd(),
-          "public",
-          "build",
-          "downloads"
-        );
-        if (!fs.existsSync(downloadsPath)) {
-          fs.mkdirSync(downloadsPath, { recursive: true });
-        }
+        if (
+          !existingAd ||
+          new Date(ad.updated_at) > new Date(existingAd.updated_at)
+        ) {
+          const downloadsPath = path.join(
+            process.cwd(),
+            "public",
+            "build",
+            "downloads"
+          );
+          if (!fs.existsSync(downloadsPath)) {
+            fs.mkdirSync(downloadsPath, { recursive: true });
+          }
 
-        const filePath = path.join(downloadsPath, path.basename(ad.url));
+          const filePath = path.join(downloadsPath, path.basename(ad.url));
 
-        await downloadFile(ad.url, filePath, () => {
-          ad.local_url = filePath;
-          saveOrUpdateAd(ad);
-          adsStore.update((value) => {
-            value = [...value, ad];
-            return value;
+          await downloadFile(ad.url, filePath, () => {
+            ad.local_url = filePath;
+            saveOrUpdateAd(ad);
+            adsStore.update((value) => {
+              value = [...value, ad];
+              return value;
+            });
           });
-        });
-      }
+        }
+      });
+      resolve(newAds);
     });
   } catch (error) {
     console.error("Error fetching ads:", error);
