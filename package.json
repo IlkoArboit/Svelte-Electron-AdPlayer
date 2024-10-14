@@ -21,6 +21,7 @@
     "svelte": "^3.55.0"
   },
   "dependencies": {
+    "lokijs": "^1.5.12",
     "sirv-cli": "^2.0.0",
     "svelte-app": "file:"
   }
