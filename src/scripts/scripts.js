@@ -6,10 +6,6 @@ import { fileURLToPath } from "url";
 import path, { join, dirname } from "path";
 const fs = require("fs");
 const https = require("https");
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 /**
  * The function initializes a database collection for ads, ensuring uniqueness based on the "id" field.
  */
@@ -67,7 +63,6 @@ async function downloadFile(url, dest, callback) {
  * or updates them in a collection.
  */
 export async function fetchAds() {
-  console.log();
   try {
     const response = await fetch("http://localhost:3001/getMediaData");
     const newAds = await response.json();
@@ -80,11 +75,17 @@ export async function fetchAds() {
         !existingAd ||
         new Date(ad.updated_at) > new Date(existingAd.updated_at)
       ) {
-        const filePath = path.join(
-          __dirname,
-          "downloads",
-          path.basename(ad.url)
+        const downloadsPath = path.join(
+          process.cwd(),
+          "public",
+          "build",
+          "downloads"
         );
+        if (!fs.existsSync(downloadsPath)) {
+          fs.mkdirSync(downloadsPath, { recursive: true });
+        }
+
+        const filePath = path.join(downloadsPath, path.basename(ad.url));
 
         await downloadFile(ad.url, filePath, () => {
           ad.local_url = filePath;
