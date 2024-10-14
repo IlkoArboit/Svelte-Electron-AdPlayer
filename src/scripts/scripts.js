@@ -1,12 +1,19 @@
 import Loki from "lokijs";
 const db = new Loki("ads.db");
-import { adsCollectionStore } from "./store";
+import { adsCollectionStore, adsStore } from "./store";
 import { get } from "svelte/store";
+import { fileURLToPath } from "url";
+import path, { join, dirname } from "path";
+const fs = require("fs");
+const https = require("https");
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * The function initializes a database collection for ads, ensuring uniqueness based on the "id" field.
  */
-function initializeDatabase() {
+export async function initializeDatabase() {
   adsCollectionStore.set(db.getCollection("ads"));
   if (!get(adsCollectionStore)) {
     adsCollectionStore.set(db.addCollection("ads", { unique: ["id"] }));
@@ -53,4 +60,43 @@ async function downloadFile(url, dest, callback) {
       file.close(callback);
     });
   });
+}
+
+/**
+ * The function fetches ads data from a specified URL, checks for updates, downloads new ads, and saves
+ * or updates them in a collection.
+ */
+export async function fetchAds() {
+  console.log();
+  try {
+    const response = await fetch("http://localhost:3001/getMediaData");
+    const newAds = await response.json();
+
+    adsStore.set([]);
+    await newAds.forEach(async (ad) => {
+      const existingAd = get(adsCollectionStore).findOne({ id: ad.id });
+
+      if (
+        !existingAd ||
+        new Date(ad.updated_at) > new Date(existingAd.updated_at)
+      ) {
+        const filePath = path.join(
+          __dirname,
+          "downloads",
+          path.basename(ad.url)
+        );
+
+        await downloadFile(ad.url, filePath, () => {
+          ad.local_url = filePath;
+          saveOrUpdateAd(ad);
+          adsStore.update((value) => {
+            value = [...value, ad];
+            return value;
+          });
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching ads:", error);
+  }
 }
